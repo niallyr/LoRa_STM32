@@ -1,8 +1,8 @@
 .\sx1276mb1las\low_power.o: ..\..\..\..\..\..\..\Middlewares\Third_Party\Lora\Utilities\low_power.c
 .\sx1276mb1las\low_power.o: ..\..\inc\hw.h
-.\sx1276mb1las\low_power.o: D:\ARM\ARM\ARMCC\Bin\..\include\math.h
-.\sx1276mb1las\low_power.o: D:\ARM\ARM\ARMCC\Bin\..\include\stdbool.h
-.\sx1276mb1las\low_power.o: D:\ARM\ARM\ARMCC\Bin\..\include\stdint.h
+.\sx1276mb1las\low_power.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
+.\sx1276mb1las\low_power.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdbool.h
+.\sx1276mb1las\low_power.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
 .\sx1276mb1las\low_power.o: ..\..\inc\hw_conf.h
 .\sx1276mb1las\low_power.o: ..\..\..\..\..\..\..\Drivers\STM32L0xx_HAL_Driver\Inc\stm32l0xx_hal.h
 .\sx1276mb1las\low_power.o: ..\..\inc\stm32l0xx_hal_conf.h
@@ -17,7 +17,7 @@
 .\sx1276mb1las\low_power.o: ..\..\..\..\..\..\..\Drivers\CMSIS\Device\ST\STM32L0xx\Include\system_stm32l0xx.h
 .\sx1276mb1las\low_power.o: ..\..\..\..\..\..\..\Drivers\STM32L0xx_HAL_Driver\Inc\stm32l0xx_hal.h
 .\sx1276mb1las\low_power.o: ..\..\..\..\..\..\..\Drivers\STM32L0xx_HAL_Driver\Inc\Legacy/stm32_hal_legacy.h
-.\sx1276mb1las\low_power.o: D:\ARM\ARM\ARMCC\Bin\..\include\stdio.h
+.\sx1276mb1las\low_power.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
 .\sx1276mb1las\low_power.o: ..\..\..\..\..\..\..\Drivers\STM32L0xx_HAL_Driver\Inc\stm32l0xx_hal_rcc_ex.h
 .\sx1276mb1las\low_power.o: ..\..\..\..\..\..\..\Drivers\STM32L0xx_HAL_Driver\Inc\stm32l0xx_hal_gpio.h
 .\sx1276mb1las\low_power.o: ..\..\..\..\..\..\..\Drivers\STM32L0xx_HAL_Driver\Inc\stm32l0xx_hal_gpio_ex.h
@@ -48,6 +48,6 @@
 .\sx1276mb1las\low_power.o: ..\..\..\..\..\..\..\Middlewares\Third_Party\Lora\Utilities\utilities.h
 .\sx1276mb1las\low_power.o: ..\..\inc\hw_msp.h
 .\sx1276mb1las\low_power.o: ..\..\inc\debug.h
-.\sx1276mb1las\low_power.o: D:\ARM\ARM\ARMCC\Bin\..\include\string.h
+.\sx1276mb1las\low_power.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
 .\sx1276mb1las\low_power.o: ..\..\inc\vcom.h
 .\sx1276mb1las\low_power.o: ..\..\..\..\..\..\..\Middlewares\Third_Party\Lora\Utilities\low_power.h

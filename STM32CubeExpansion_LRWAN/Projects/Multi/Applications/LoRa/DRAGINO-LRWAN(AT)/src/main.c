@@ -73,7 +73,7 @@ Maintainer: Miguel Luis, Gregory Cristian and Wael Guibene
 /*!
  * CAYENNE_LPP is myDevices Application server.
  */
-//#define CAYENNE_LPP
+#define CAYENNE_LPP
 #define LPP_DATATYPE_DIGITAL_INPUT  0x0
 #define LPP_DATATYPE_DIGITAL_OUTPUT 0x1
 #define LPP_DATATYPE_HUMIDITY       0x68

@@ -1,7 +1,7 @@
 .\sx1276mb1las\at.o: ..\..\src\at.c
-.\sx1276mb1las\at.o: D:\ARM\ARM\ARMCC\Bin\..\include\stdbool.h
-.\sx1276mb1las\at.o: D:\ARM\ARM\ARMCC\Bin\..\include\stdint.h
-.\sx1276mb1las\at.o: D:\ARM\ARM\ARMCC\Bin\..\include\string.h
+.\sx1276mb1las\at.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdbool.h
+.\sx1276mb1las\at.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
+.\sx1276mb1las\at.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
 .\sx1276mb1las\at.o: ..\..\inc\at.h
 .\sx1276mb1las\at.o: ..\..\inc\lora.h
 .\sx1276mb1las\at.o: ..\..\inc\Commissioning.h
@@ -20,7 +20,7 @@
 .\sx1276mb1las\at.o: ..\..\..\..\..\..\..\Drivers\CMSIS\Device\ST\STM32L0xx\Include\system_stm32l0xx.h
 .\sx1276mb1las\at.o: ..\..\..\..\..\..\..\Drivers\STM32L0xx_HAL_Driver\Inc\stm32l0xx_hal.h
 .\sx1276mb1las\at.o: ..\..\..\..\..\..\..\Drivers\STM32L0xx_HAL_Driver\Inc\Legacy/stm32_hal_legacy.h
-.\sx1276mb1las\at.o: D:\ARM\ARM\ARMCC\Bin\..\include\stdio.h
+.\sx1276mb1las\at.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
 .\sx1276mb1las\at.o: ..\..\..\..\..\..\..\Drivers\STM32L0xx_HAL_Driver\Inc\stm32l0xx_hal_rcc_ex.h
 .\sx1276mb1las\at.o: ..\..\..\..\..\..\..\Drivers\STM32L0xx_HAL_Driver\Inc\stm32l0xx_hal_gpio.h
 .\sx1276mb1las\at.o: ..\..\..\..\..\..\..\Drivers\STM32L0xx_HAL_Driver\Inc\stm32l0xx_hal_gpio_ex.h
