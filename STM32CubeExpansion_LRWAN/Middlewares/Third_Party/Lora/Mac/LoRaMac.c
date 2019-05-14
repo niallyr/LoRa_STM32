@@ -31,7 +31,11 @@ Maintainer: Miguel Luis ( Semtech ), Gregory Cristian ( Semtech ) and Daniel Jae
 #include "debug.h"
 #include "LoRaMacTest.h"
 
+extern uint8_t symbtime1_value;
+extern uint8_t flag1;
 
+extern uint8_t symbtime2_value;
+extern uint8_t flag2;
 
 /*!
  * Maximum PHY layer payload size
@@ -174,6 +178,8 @@ static uint32_t DownLinkCounter = 0;
  * UpLinkCounter value
  */
 static bool IsUpLinkCounterFixed = false;
+
+static void onNetworkJointimesout( void );
 
 /*!
  * Used for test purposes. Disables the opening of the reception windows.
@@ -1256,6 +1262,7 @@ static void OnMacStateCheckTimerEvent( void )
                     {
                         if( JoinRequestTrials >= MaxJoinRequestTrials )
                         {
+													  NVIC_SystemReset();
                             LoRaMacState &= ~LORAMAC_TX_RUNNING;
                         }
                         else
@@ -1453,6 +1460,15 @@ static void OnRxWindow1TimerEvent( void )
     RxWindow1Config.RxContinuous = false;
     RxWindow1Config.Window = RxSlot;
 
+	  if(flag1==0)                                       //configure the RX1windowtimeout
+    {
+			symbtime1_value=RxWindow1Config.WindowTimeout;
+		}
+    else
+		{
+			RxWindow1Config.WindowTimeout=symbtime1_value;
+		}	
+		
     if( LoRaMacDeviceClass == CLASS_C )
     {
         Radio.Standby( );
@@ -1472,6 +1488,15 @@ static void OnRxWindow2TimerEvent( void )
     RxWindow2Config.RepeaterSupport = RepeaterSupport;
     RxWindow2Config.Window = 1;
 
+		 if(flag2==0)                                     //configure the RX2windowtimeout
+    {
+			symbtime2_value=RxWindow2Config.WindowTimeout;
+		}
+    else
+		{
+			RxWindow2Config.WindowTimeout=symbtime2_value;
+		}	
+		
     if( LoRaMacDeviceClass != CLASS_C )
     {
         RxWindow2Config.RxContinuous = false;
@@ -1967,7 +1992,8 @@ static LoRaMacStatus_t ScheduleTx( void )
         RxWindow2Delay = LoRaMacParams.ReceiveDelay2 + RxWindow2Config.WindowOffset;
     }
 
-    // Schedule transmission of frame
+    /*
+		// Schedule transmission of frame
     if( dutyCycleTimeOff == 0 )
     {
         // Try to send now
@@ -1982,6 +2008,59 @@ static LoRaMacStatus_t ScheduleTx( void )
 
         return LORAMAC_STATUS_OK;
     }
+		*/
+		if( IsLoRaMacNetworkJoined == true )
+		{
+		  // Schedule transmission of frame
+      if( dutyCycleTimeOff == 0 )
+      {
+        // Try to send now
+        return SendFrameOnChannel( Channel );
+      }
+    else
+      {
+        // Send later - prepare timer
+        LoRaMacState |= LORAMAC_TX_DELAYED;
+        TimerSetValue( &TxDelayedTimer, dutyCycleTimeOff );
+        TimerStart( &TxDelayedTimer );
+
+        return LORAMAC_STATUS_OK;
+      }
+	  }
+		else
+		{
+			if(JoinRequestTrials>50)
+			{
+				TimerInit( &TxDelayedTimer, onNetworkJointimesout );
+        TimerSetValue( &TxDelayedTimer, 1800000 );
+        TimerStart( &TxDelayedTimer );
+
+        return LORAMAC_STATUS_OK;
+			}
+			else
+			{
+				// Schedule transmission of frame
+        if( dutyCycleTimeOff == 0 )
+        { 
+          // Try to send now
+          return SendFrameOnChannel( Channel );
+        }
+        else
+        {
+          // Send later - prepare timer
+          LoRaMacState |= LORAMAC_TX_DELAYED;
+          TimerSetValue( &TxDelayedTimer, dutyCycleTimeOff );
+          TimerStart( &TxDelayedTimer );
+
+          return LORAMAC_STATUS_OK;
+        }
+			}
+		}
+}
+
+static void onNetworkJointimesout( void )
+{
+	SendFrameOnChannel( Channel );
 }
 
 static void CalculateBackOff( uint8_t channel )
@@ -2229,7 +2308,7 @@ LoRaMacStatus_t SendFrameOnChannel( uint8_t channel )
     txConfig.AntennaGain = LoRaMacParams.AntennaGain;
     txConfig.PktLen = LoRaMacBufferPktLen;
 
-    PRINTF( "\n\r*** UplinkCounter= %d ***\n\r", UpLinkCounter );
+    PRINTF( "\n\r***** UpLinkCounter= %d *****\n\r", UpLinkCounter );
 
     RegionTxConfig( LoRaMacRegion, &txConfig, &txPower, &TxTimeOnAir );
 
@@ -2936,6 +3015,7 @@ LoRaMacStatus_t LoRaMacMibSetRequestConfirm( MibRequestConfirm_t *mibSet )
             {
                 LoRaMacParamsDefaults.ChannelsTxPower = verify.TxPower;
             }
+
             else
             {
                 status = LORAMAC_STATUS_PARAMETER_INVALID;
@@ -2950,6 +3030,10 @@ LoRaMacStatus_t LoRaMacMibSetRequestConfirm( MibRequestConfirm_t *mibSet )
             {
                 LoRaMacParams.ChannelsTxPower = verify.TxPower;
             }
+						else if((verify.TxPower>=40)&&(verify.TxPower<=50))
+						{
+							 LoRaMacParams.ChannelsTxPower = verify.TxPower;
+						}
             else
             {
                 status = LORAMAC_STATUS_PARAMETER_INVALID;

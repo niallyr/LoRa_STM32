@@ -1,22 +1,8 @@
-/*
- / _____)             _              | |
-( (____  _____ ____ _| |_ _____  ____| |__
- \____ \| ___ |    (_   _) ___ |/ ___)  _ \
- _____) ) ____| | | || |_| ____( (___| | | |
-(______/|_____)_|_|_| \__)_____)\____)_| |_|
-    (C)2013 Semtech
-
-Description: virtual com port driver
-
-License: Revised BSD License, see LICENSE.TXT file include in the project
-
-Maintainer: Miguel Luis and Gregory Cristian
-*/
  /******************************************************************************
   * @file    vcom.h
   * @author  MCD Application Team
-  * @version V1.1.2
-  * @date    08-September-2017
+  * @version V1.1.4
+  * @date    10-July-2018
   * @brief   Header for vcom.c module
   ******************************************************************************
   * @attention
@@ -62,22 +48,41 @@ Maintainer: Miguel Luis and Gregory Cristian
 #define __VCOM_H__
 
 #ifdef __cplusplus
- extern "C" {
+extern "C" {
 #endif
-   
+
 /* Includes ------------------------------------------------------------------*/
+#include "hw_conf.h"
+#include <stdint.h>
+#include "trace.h"
+
+	
 /* Exported types ------------------------------------------------------------*/
 /* Exported constants --------------------------------------------------------*/
 /* External variables --------------------------------------------------------*/
 
-/* Exported functions ------------------------------------------------------- */ 
-
+/* Exported functions ------------------------------------------------------- */
 /** 
-* @brief  Init the VCOM.
-* @param  None
+* @brief  init vcom 
+* @param  callback when Tx buffer has been sent
 * @return None
 */
-void vcom_Init(void);
+void vcom_Init(  void (*Txcb)(void) ); 
+  
+/** 
+* @brief  init receiver of vcom 
+* @param  callback when Rx char is received
+* @return None
+*/
+void vcom_ReceiveInit(  void (*RxCb)(uint8_t *rxChar) ); 
+
+/** 
+* @brief  send buffer @p_data of size size to vcom in dma mode
+* @param  p_data data to be sent
+* @param  szie of buffer p_data to be sent
+* @return None
+*/
+void vcom_Trace(  uint8_t *p_data, uint16_t size );
 
    /** 
 * @brief  DeInit the VCOM.
@@ -93,80 +98,34 @@ void vcom_DeInit(void);
 */
 void vcom_IoInit(void);
   
-   /** 
+/** 
 * @brief  DeInit the VCOM IOs.
 * @param  None
 * @return None
 */
 void vcom_IoDeInit(void);
-void vcom_Send_f(const char *format, ...);  
-/** 
-* @brief  Records string on circular Buffer and set SW interrupt
-* @note   Set NVIC to call vcom_Send
-* @param  string
-* @return None
-*/
-void vcom_Send(const char *format, ...);
 
 /** 
-* @brief  Sends circular Buffer on com port in IT mode
-* @note   called from low Priority interrupt
+* @brief  last byte has been sent on the uart line
 * @param  None
 * @return None
 */
-void vcom_Print( void);
+void vcom_IRQHandler(void);
 
 /** 
-* @brief  Records string on circular Buffer
-* @note   To be called only from critical section from low power section
-*         Other wise use vcom_Send
-* @param  string
+* @brief  last byte has been sent from memeory to uart data register
+* @param  None
 * @return None
 */
-void vcom_Send_Lp( char *format, ... );
+void vcom_DMA_TX_IRQHandler(void);
 
-/**
- * @brief  Checks if a new character has been received on com port
- * @param  None
- * @retval Returns SET if new character has been received on com port, RESET otherwise
- */
-FlagStatus IsNewCharReceived(void);
-
-/**
- * @brief  Gets new received characters on com port
- * @param  None
- * @retval Returns the character
- */
-uint8_t GetNewChar(void);
-
-/**
- * @brief  Takes one character that has been received and save it in uart_context.buffRx
- * @param  received character
- */
-static void receive(char rx);
-
-/**
- * @brief  Init the VCOM RX
- * @param  None
- * @retval None
- */
-void vcom_ReceiveInit(void);
-
-/**
- * @brief  vcom IRQ Handler
- * @param  None
- * @retval None
- */
-void vcom_IRQHandler(UART_HandleTypeDef *huart);
-
-/* Exported macros -----------------------------------------------------------*/
 #if 1
-#define PRINTF(...)            vcom_Send(__VA_ARGS__)
-#define PRINTF_F(...)     vcom_Send_f(__VA_ARGS__)
+#define PPRINTF(...)     do{ } while( 0!= TraceSend(__VA_ARGS__) ) //Polling Mode
+
+#define PRINTF(...)     do{  TraceSend(__VA_ARGS__); }while(0)
 #else
 #define PRINTF(...)
 #endif
-
 
 #ifdef __cplusplus
 }

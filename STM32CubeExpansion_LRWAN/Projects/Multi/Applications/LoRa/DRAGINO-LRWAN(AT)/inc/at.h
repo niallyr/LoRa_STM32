@@ -1,8 +1,8 @@
 /*******************************************************************************
  * @file    at.h
  * @author  MCD Application Team
- * @version V1.1.2
- * @date    08-September-2017
+ * @version V1.1.4
+ * @date    08-January-2018
  * @brief   Header for driver at.c module
  ******************************************************************************
  * @attention
@@ -76,10 +76,11 @@ typedef enum eATEerror
 /* External variables --------------------------------------------------------*/
 /* Exported macros -----------------------------------------------------------*/
 /* AT printf */
-#define AT_PRINTF(...)     vcom_Send(__VA_ARGS__)
-#define AT_PRINTF_F(...)     vcom_Send_f(__VA_ARGS__)
+#define AT_PRINTF     PPRINTF
+
 /* AT Command strings. Commands start with AT */
 #define AT_RESET      "Z"
+#define AT_FDR        "+FDR"
 #define AT_DEUI       "+DEUI"
 #define AT_DADDR      "+DADDR"
 #define AT_APPKEY     "+APPKEY"
@@ -113,15 +114,16 @@ typedef enum eATEerror
 #define AT_CFS        "+CFS"
 #define AT_SNR        "+SNR"
 #define AT_RSSI       "+RSSI"
-//#define AT_BAT        "+BAT"
-//#define AT_TRSSI      "+TRSSI"
-//#define AT_TTONE      "+TTONE"
-//#define AT_TTLRA      "+TTLRA"
-//#define AT_TRLRA      "+TRLRA"
-//#define AT_TCONF      "+TCONF"
-//#define AT_TOFF       "+TOFF"
-//#define AT_CERTIF     "+CERTIF"
 #define AT_TDC        "+TDC"
+#define AT_PORT       "+PORT"
+#define AT_DISAT      "+DISAT"
+#define AT_CHS        "+CHS"
+#define AT_CHE        "+CHE"
+#define AT_CFG        "+CFG"
+#define AT_RX1WTO     "+RX1WTO"
+#define AT_RX2WTO     "+RX2WTO"
+#define AT_MOD        "+MOD"
+
 /* Exported functions ------------------------------------------------------- */
 
 /**
@@ -153,6 +155,13 @@ ATEerror_t at_return_error(const char *param);
  * @retval AT_OK
  */
 ATEerror_t at_reset(const char *param);
+
+/**
+ * @brief  Flash erase
+ * @param  Param string of the AT command - unused
+ * @retval AT_OK
+ */
+ATEerror_t at_FDR(const char *param);
 
 /**
  * @brief  Print Device EUI
@@ -561,12 +570,12 @@ ATEerror_t at_test_set_lora_config(const char *param);
  */
 ATEerror_t at_test_get_lora_config(const char *param);
 
-/**
- * @brief  set the Modem in Certif Mode
- * @param  String parameter
- * @retval AT_OK
- */
-ATEerror_t at_Certif( const char *param );
+///**
+// * @brief  set the Modem in Certif Mode
+// * @param  String parameter
+// * @retval AT_OK
+// */
+//ATEerror_t at_Certif( const char *param );
 
 /**
  * @brief  
@@ -581,6 +590,41 @@ ATEerror_t at_TDC_get(const char *param);
  * @retval AT_OK
  */
 ATEerror_t at_TDC_set(const char *param);
+
+/**
+ * @brief  
+ * @param  String parameter
+ * @retval AT_OK
+ */
+ATEerror_t at_application_port_get(const char *param);
+
+/**
+ * @brief  
+ * @param  String parameter
+ * @retval AT_OK
+ */
+ATEerror_t at_application_port_set(const char *param);
+
+ATEerror_t at_CHS_get(const char *param);
+
+ATEerror_t at_CHS_set(const char *param);
+
+ATEerror_t at_CHE_get(const char *param);
+
+ATEerror_t at_CHE_set(const char *param);
+
+ATEerror_t at_symbtimeout1LSB_get(const char *param);
+
+ATEerror_t at_symbtimeout1LSB_set(const char *param);
+
+ATEerror_t at_symbtimeout2LSB_get(const char *param);
+
+ATEerror_t at_symbtimeout2LSB_set(const char *param);
+
+ATEerror_t at_MOD_set(const char *param);
+
+ATEerror_t at_MOD_get(const char *param);
+
 #ifdef __cplusplus
 }
 #endif

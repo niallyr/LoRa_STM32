@@ -1,8 +1,8 @@
  /******************************************************************************
   * @file    bsp.c
   * @author  MCD Application Team
-  * @version V1.1.2
-  * @date    08-September-2017
+  * @version V1.1.4
+  * @date    08-January-2018
   * @brief   manages the sensors on the application
   ******************************************************************************
   * @attention
@@ -51,69 +51,219 @@
 #include "timeServer.h"
 #include "bsp.h"
 
+/* Private typedef -----------------------------------------------------------*/
+/* Private define ------------------------------------------------------------*/
 #if defined(LoRa_Sensor_Node)
 #include "ds18b20.h"
 #include "oil_float.h"
 #include "gpio_exti.h"
 #include "sht20.h"
+#include "sht31.h"
+#include "pwr_out.h"
+#include "ult.h"
 #endif
-/* Private typedef -----------------------------------------------------------*/
-/* Private define ------------------------------------------------------------*/
-
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 /* Private function prototypes -----------------------------------------------*/
 /* Exported functions ---------------------------------------------------------*/
+
+/* Private variables ---------------------------------------------------------*/
+uint16_t ult;
 static __IO uint16_t AD_code1=0;
 static __IO uint16_t AD_code2=0;
-static __IO float temp2=0;
-static __IO float hum1=0;
-/* Private variables ---------------------------------------------------------*/
+
+#ifdef USE_SHT
+static int flags=0;
+#endif
+
+//static GPIO_InitTypeDef  GPIO_InitStruct;
+extern uint16_t batteryLevel_mV;
+
+#ifdef USE_SHT
+extern I2C_HandleTypeDef I2cHandle1;
+extern I2C_HandleTypeDef I2cHandle2;
+#endif
+
+extern void Read_Config(void);
+extern uint8_t mode;
+
 void BSP_sensor_Read( sensor_t *sensor_data)
-{	
-	#if defined(LoRa_Sensor_Node)
+{
+ 	#if defined(LoRa_Sensor_Node)
+	
+	HAL_GPIO_WritePin(PWR_OUT_PORT,PWR_OUT_PIN,GPIO_PIN_RESET);//Enable 5v power supply
+	
 	sensor_data->temp1=DS18B20_GetTemp_SkipRom();
 	
 	HAL_GPIO_WritePin(OIL_CONTROL_PORT,OIL_CONTROL_PIN,GPIO_PIN_RESET);
 	AD_code1=HW_AdcReadChannel( ADC_Channel_Oil );
 	HAL_GPIO_WritePin(OIL_CONTROL_PORT,OIL_CONTROL_PIN,GPIO_PIN_SET);
-
-	sensor_data->oil1=(AD_code1>>8)&0x0F;
-	sensor_data->oil2=AD_code1&0xFF;
+	
+	HW_GetBatteryLevel( );
+	sensor_data->oil=AD_code1*batteryLevel_mV/4095;
 	
 	sensor_data->in1=HAL_GPIO_ReadPin(GPIO_INPUT_PORT,GPIO_INPUT_PIN1);
-	sensor_data->in2=HAL_GPIO_ReadPin(GPIO_INPUT_PORT,GPIO_INPUT_PIN2);
-	sensor_data->in3=HAL_GPIO_ReadPin(GPIO_INPUT_PORT,GPIO_INPUT_PIN3);
 	
-	AD_code2=HW_AdcReadChannel( ADC_Channel_IN1 );
-
-	sensor_data->ADC_IN1_H=(AD_code2>>8)&0x0F;
-	sensor_data->ADC_IN1_L=AD_code2&0xFF;
-	
-	 #ifdef USE_SHT20
+	 if(mode==1)
+	 {		
+   #ifdef USE_SHT
+	 if(flags==0)
+	 {
+		 sensor_data->temp_sht=6553.5;
+		 sensor_data->hum_sht=6553.5;
+	 } 
+	 if(flags==1)
+	 {
+	float temp2,hum1;
 	temp2=SHT20_RT();//get temperature
 	hum1=SHT20_RH(); //get humidity
-	sensor_data->tem_inte=(int)temp2;
-	sensor_data->tem_dec=(int)(temp2*100)%100;
-	sensor_data->hum_inte=(int)hum1;
-	sensor_data->hum_dec=(int)(hum1*100)%100;
+	sensor_data->temp_sht=temp2;
+	sensor_data->hum_sht=hum1;
+   }
+	if(flags==2)
+	{
+	float temp2,hum1;
+	temp2=SHT31_RT();//get temperature
+	hum1=SHT31_RH(); //get humidity
+	sensor_data->temp_sht=temp2;
+	sensor_data->hum_sht=hum1;
+	}
 	 #endif
+		}
+	 
+		if(mode==2)
+	 {
+		 ult=ULT_test();
+	 }
+	 
+	 HAL_GPIO_WritePin(PWR_OUT_PORT,PWR_OUT_PIN,GPIO_PIN_SET);//Disable 5v power supply
 	 
 	#endif
 }
 
+void HAL_I2C_MspInit(I2C_HandleTypeDef *hi2c)
+{
+  GPIO_InitTypeDef  GPIO_InitStruct;
+  RCC_PeriphCLKInitTypeDef  RCC_PeriphCLKInitStruct;
+  
+  /*##-1- Configure the I2C clock source. The clock is derived from the SYSCLK #*/
+  RCC_PeriphCLKInitStruct.PeriphClockSelection = RCC_PERIPHCLK_I2Cx;
+  RCC_PeriphCLKInitStruct.I2c1ClockSelection = RCC_I2CxCLKSOURCE_SYSCLK;
+  HAL_RCCEx_PeriphCLKConfig(&RCC_PeriphCLKInitStruct);
+
+  /*##-2- Enable peripherals and GPIO Clocks #################################*/
+  /* Enable GPIO TX/RX clock */
+  I2Cx_SCL_GPIO_CLK_ENABLE();
+  I2Cx_SDA_GPIO_CLK_ENABLE();
+  /* Enable I2Cx clock */
+  I2Cx_CLK_ENABLE();
+  
+  /*##-3- Configure peripheral GPIO ##########################################*/  
+  /* I2C TX GPIO pin configuration  */
+  GPIO_InitStruct.Pin       = I2Cx_SCL_PIN;
+  GPIO_InitStruct.Mode      = GPIO_MODE_AF_OD;
+  GPIO_InitStruct.Pull      = GPIO_NOPULL;
+  GPIO_InitStruct.Speed     = GPIO_SPEED_FREQ_VERY_HIGH;
+  GPIO_InitStruct.Alternate = I2Cx_SCL_SDA_AF;
+  HAL_GPIO_Init(I2Cx_SCL_GPIO_PORT, &GPIO_InitStruct);
+    
+  /* I2C RX GPIO pin configuration  */
+  GPIO_InitStruct.Pin       = I2Cx_SDA_PIN;
+  GPIO_InitStruct.Alternate = I2Cx_SCL_SDA_AF;
+  HAL_GPIO_Init(I2Cx_SDA_GPIO_PORT, &GPIO_InitStruct);
+	
+  /* NVIC for I2Cx */
+  HAL_NVIC_SetPriority(I2Cx_IRQn, 0, 1);
+  HAL_NVIC_EnableIRQ(I2Cx_IRQn);
+}
+/**
+  * @brief I2C MSP De-Initialization 
+  *        This function frees the hardware resources used in this example:
+  *          - Disable the Peripheral's clock
+  *          - Revert GPIO, DMA and NVIC configuration to their default state
+  * @param hi2c: I2C handle pointer
+  * @retval None
+  */
+void HAL_I2C_MspDeInit(I2C_HandleTypeDef *hi2c)
+{
+  /*##-1- Reset peripherals ##################################################*/
+  I2Cx_FORCE_RESET();
+  I2Cx_RELEASE_RESET();
+
+  /*##-2- Disable peripherals and GPIO Clocks #################################*/
+  /* Configure I2C Tx as alternate function  */
+  HAL_GPIO_DeInit(I2Cx_SCL_GPIO_PORT, I2Cx_SCL_PIN);
+  /* Configure I2C Rx as alternate function  */
+  HAL_GPIO_DeInit(I2Cx_SDA_GPIO_PORT, I2Cx_SDA_PIN);
+}
+
 void  BSP_sensor_Init( void  )
 {
-	#if defined(LoRa_Sensor_Node)
+  #if defined(LoRa_Sensor_Node)
 //	 while(DS18B20_Init()==1);
-   BSP_oil_float_Init();
+	 Read_Config();
+	
 	 GPIO_EXTI_IoInit();
 	 GPIO_INPUT_IoInit();
+	 BSP_oil_float_Init();
 	
-	 #ifdef USE_SHT20
+	 if(mode==1)
+	 {	 
+	 #ifdef USE_SHT
+	 int sum1=0,sum2=0;
+	 uint8_t txdata1[1]={0xE7},txdata2[2]={0xF3,0x2D};
+	 
 	 BSP_sht20_Init();
+ 
+		 while(HAL_I2C_Master_Transmit(&I2cHandle1,0x80,txdata1,1,1000) != HAL_OK)
+	 {
+		 sum1++;
+		 if(sum1==100)
+		 {
+			 flags=0;
+			 break;
+		 }
+	 }
+	 if(HAL_I2C_Master_Transmit(&I2cHandle1,0x80,txdata1,1,1000) == HAL_OK)
+	 {
+		 flags=1;
+	   PRINTF(" Use Sensor is STH20\n\r");
+	 }
+	 
+	 if(flags==0)
+	 {
+		 
+		 BSP_sht31_Init();
+		 
+	 	 while(HAL_I2C_Master_Transmit(&I2cHandle2,0x88,txdata2,2,1000) != HAL_OK) 
+	 {
+		 sum2++;
+		 if(sum2==100)
+		 {
+			 flags=0;
+			 break;
+		 }
+	 }
+	 if(HAL_I2C_Master_Transmit(&I2cHandle2,0x88,txdata2,2,1000) == HAL_OK)
+	 {
+		 flags=2;
+		 PRINTF("  Use Sensor is STH31\n\r");
+	 }
+   }
+	 
+	 if(flags==0)
+	 {
+		 PRINTF("  IIC is not connect\n\r");
+	 }	
 	 #endif
-	
+  }
+	if(mode==2)
+	{ 
+		GPIO_ULT_INPUT_Init();
+		GPIO_ULT_OUTPUT_Init();
+		TIM2_Init();
+	}
+	pwr_control_IoInit();
 	#endif
 }
 

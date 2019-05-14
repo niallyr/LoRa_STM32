@@ -1,8 +1,8 @@
 /*******************************************************************************
  * @file    at.c
  * @author  MCD Application Team
- * @version V1.1.2
- * @date    08-September-2017
+ * @version V1.1.4
+ * @date    08-January-2018
  * @brief   at command API
  ******************************************************************************
  * @attention
@@ -49,17 +49,22 @@
 #include <stdint.h>
 #include <string.h>
 #include "at.h"
-#include "lora.h"
-#include "Commissioning.h"
 #include "utilities.h"
-#include "LoRaMac.h"
+#include "lora.h"
 #include "LoRaMacTest.h"
 #include "radio.h"
 #include "vcom.h"
 #include "tiny_sscanf.h"
 #include "version.h"
 #include "hw_msp.h"
-#include "test_rf.h"
+#include "flash_eraseprogram.h"
+#include "timeServer.h"
+
+uint8_t symbtime1_value=0;  //RX1windowtimeout 
+uint8_t flag1=0;
+
+uint8_t symbtime2_value=0;  //RX2windowtimeout 
+uint8_t flag2=0;
 
 /* External variables --------------------------------------------------------*/
 /* Private typedef -----------------------------------------------------------*/
@@ -68,7 +73,9 @@
  * @brief Max size of the data that can be received
  */
 #define MAX_RECEIVED_DATA 255
-extern  LoRaParam_t* LoRaParamInit;
+extern uint32_t APP_TX_DUTYCYCLE;
+extern uint8_t mode;
+
 /* Private macro -------------------------------------------------------------*/
 /**
  * @brief Macro to return when an error occurs
@@ -79,6 +86,20 @@ extern  LoRaParam_t* LoRaParamInit;
   } while (0)
 
 /* Private variables ---------------------------------------------------------*/
+/*!
+ * User application data buffer size
+ */
+#define LORAWAN_APP_DATA_BUFF_SIZE                           64
+
+/*!
+ * User application data
+ */
+static uint8_t AppDataBuff[LORAWAN_APP_DATA_BUFF_SIZE];
+
+/*!
+ * User application data structure
+ */
+static lora_AppData_t AppData={ AppDataBuff,  0 ,0 };
 /**
  * @brief Buffer that contains the last received data
  */
@@ -180,6 +201,15 @@ ATEerror_t at_reset(const char *param)
   return AT_OK;
 }
 
+ATEerror_t at_FDR(const char *param)
+{
+	FLASH_erase(0x8018F80);//page 799
+	FLASH_erase(FLASH_USER_START_ADDR_CONFIG);
+	AT_PRINTF("OK\n\r");
+	NVIC_SystemReset();
+  return AT_OK;
+}
+
 ATEerror_t at_DevEUI_get(const char *param)
 {
   print_8_02x(lora_config_deveui_get());
@@ -200,7 +230,6 @@ ATEerror_t at_DevEUI_set(const char *param)
   return AT_OK;
 }
 
-
 ATEerror_t at_AppEUI_get(const char *param)
 {
   print_8_02x(lora_config_appeui_get());
@@ -218,6 +247,23 @@ ATEerror_t at_AppEUI_set(const char *param)
   }
   
   lora_config_appeui_set(AppEui);
+  return AT_OK;
+}
+
+ATEerror_t at_DevAddr_set(const char *param)
+{
+  uint32_t DevAddr;
+  if (sscanf_uint32_as_hhx(param, &DevAddr) != 4)
+  {
+    return AT_PARAM_ERROR;
+  }
+  lora_config_devaddr_set(DevAddr);
+  return AT_OK;
+}
+
+ATEerror_t at_DevAddr_get(const char *param)
+{
+  lora_config_devaddr_get();
   return AT_OK;
 }
 
@@ -302,22 +348,6 @@ ATEerror_t at_AppSKey_set(const char *param)
   return AT_OK;
 }
 
-ATEerror_t at_DevAddr_set(const char *param)
-{
-  uint32_t DevAddr;
-  if (sscanf_uint32_as_hhx(param, &DevAddr) != 4)
-  {
-    return AT_PARAM_ERROR;
-  }
-  lora_config_devaddr_set(DevAddr);
-  return AT_OK;
-}
-
-ATEerror_t at_DevAddr_get(const char *param)
-{
-  lora_config_devaddr_get();
-  return AT_OK;
-}
 //ATEerror_t at_NwkSKey_get(const char *param)
 //{
 //  MibRequestConfirm_t mib;
@@ -382,11 +412,11 @@ ATEerror_t at_DevAddr_get(const char *param)
 //  return AT_OK;
 //}
 
-ATEerror_t at_Certif( const char *param )
-{
-  lora_wan_certif( );
-  return AT_OK;
-}
+//ATEerror_t at_Certif( const char *param )
+//{
+//  lora_wan_certif( );
+//  return AT_OK;
+//}
 
 ATEerror_t at_ADR_get(const char *param)
 {
@@ -454,6 +484,7 @@ ATEerror_t at_TransmitPower_set(const char *param)
 
 ATEerror_t at_DataRate_get(const char *param)
 {
+
   MibRequestConfirm_t mib;
   LoRaMacStatus_t status;
 
@@ -468,16 +499,14 @@ ATEerror_t at_DataRate_get(const char *param)
 
 ATEerror_t at_DataRate_set(const char *param)
 {
-  MibRequestConfirm_t mib;
-  LoRaMacStatus_t status;
+  int8_t datarate;
 
-  mib.Type = MIB_CHANNELS_DATARATE;
-  if (tiny_sscanf(param, "%hhu", &mib.Param.ChannelsDatarate) != 1)
+  if (tiny_sscanf(param, "%hhu", &datarate) != 1)
   {
     return AT_PARAM_ERROR;
   }
-  status = LoRaMacMibSetRequestConfirm(&mib);
-  CHECK_STATUS(status);
+  
+  lora_config_tx_datarate_set(datarate) ;
 
   return AT_OK;
 }
@@ -487,10 +516,10 @@ ATEerror_t at_DutyCycle_set(const char *param)
   switch (param[0])
   {
     case '0':
-      lora_config_duty_cycle_set(DISABLE);
+      lora_config_duty_cycle_set(LORA_DISABLE);
       break;
     case '1':
-      lora_config_duty_cycle_set(ENABLE);
+      lora_config_duty_cycle_set(LORA_ENABLE);
       break;
     default:
       return AT_PARAM_ERROR;
@@ -501,7 +530,7 @@ ATEerror_t at_DutyCycle_set(const char *param)
 
 ATEerror_t at_DutyCycle_get(const char *param)
 {
-  if (lora_config_duty_cycle_get() == ENABLE)
+  if (lora_config_duty_cycle_get() == LORA_ENABLE)
     AT_PRINTF("1\r\n");
   else
     AT_PRINTF("0\r\n");
@@ -729,27 +758,28 @@ ATEerror_t at_JoinAcceptDelay2_set(const char *param)
 
 ATEerror_t at_NetworkJoinMode_get(const char *param)
 {
-  print_d((lora_config_otaa_get() == ENABLE ? 1 : 0));
+  print_d((lora_config_otaa_get() == LORA_ENABLE ? 1 : 0));
   return AT_OK;
 }
 
 ATEerror_t at_NetworkJoinMode_set(const char *param)
 {
-  FunctionalState status;
+  LoraState_t status;
 
   switch (param[0])
   {
     case '0':
-      status = DISABLE;
+      status = LORA_DISABLE;
       break;
     case '1':
-      status = ENABLE;
+      status = LORA_ENABLE;
       break;
     default:
       return AT_PARAM_ERROR;
   }
 
   lora_config_otaa_set(status);
+	
   return AT_OK;
 }
 
@@ -878,9 +908,8 @@ ATEerror_t at_DeviceClass_set(const char *param)
 
 ATEerror_t at_Join(const char *param)
 {
-  LoRaMacStatus_t status;
-  status = lora_join();
-  CHECK_STATUS(status);
+  LORA_Join();
+
   return AT_OK;
 }
 
@@ -902,22 +931,122 @@ ATEerror_t at_NetworkJoinStatus(const char *param)
 
 ATEerror_t at_SendBinary(const char *param)
 {
-  LoRaMacStatus_t status;
+  LoraErrorStatus status;
+  const char *buf= param;
+  unsigned char bufSize= strlen(param);
+  uint32_t appPort;
+  unsigned size=0;
+  char hex[3];
+  
+    /* read and set the application port */
+  if (1 != tiny_sscanf(buf, "%u:", &appPort))
+  {
+    PRINTF("AT+SEND without the application port");
+    return AT_PARAM_ERROR;
+  }
+  
+  /* skip the application port */
+  while (('0' <= buf[0]) && (buf[0] <= '9'))
+  {
+    buf ++;
+    bufSize --;
+  };
+  
+  if (buf[0] != ':')
+  {
+    PRINTF("AT+SEND without the application port");
+    return AT_PARAM_ERROR;
+  }
+  else
+  {
+    /*ok skip the char ':' */
+    buf ++;
+    bufSize --;
+  }
 
-  status = lora_send(param, strlen(param), 1);
-  CHECK_STATUS(status);
+  hex[2] = 0;
+  while ((size < LORAWAN_APP_DATA_BUFF_SIZE) && (bufSize > 1))
+  {
+    hex[0] = buf[size*2];
+    hex[1] = buf[size*2+1];
+    if (tiny_sscanf(hex, "%hhx", &AppData.Buff[size]) != 1)
+    {
+      return AT_PARAM_ERROR;
+    }
+    size++;
+    bufSize -= 2;
+  }
+  if (bufSize != 0)
+  {
+    return AT_PARAM_ERROR;
+  }
+  
+  AppData.BuffSize = size;
+  AppData.Port= appPort;
 
-  return AT_OK;
+  status = LORA_send( &AppData, lora_config_reqack_get() );
+  
+  if (status == LORA_SUCCESS)
+  {
+    return AT_OK;
+  }
+  else
+  {
+    return AT_ERROR;
+  }
 }
 
 ATEerror_t at_Send(const char *param)
 {
-  LoRaMacStatus_t status;
-
-  status = lora_send(param, strlen(param), 0);
-  CHECK_STATUS(status);
-
-  return AT_OK;
+  LoraErrorStatus status;
+  const char *buf= param;
+  unsigned char bufSize= strlen(param);
+  uint32_t appPort;
+  
+    /* read and set the application port */
+  if (1 != tiny_sscanf(buf, "%u:", &appPort))
+  {
+    PRINTF("AT+SEND without the application port");
+    return AT_PARAM_ERROR;
+  }
+  
+  /* skip the application port */
+  while (('0' <= buf[0]) && (buf[0] <= '9'))
+  {
+    buf ++;
+    bufSize --;
+  };
+  
+  if (buf[0] != ':')
+  {
+    PRINTF("AT+SEND without the application port");
+    return AT_PARAM_ERROR;
+  }
+  else
+  {
+    /*ok skip the char ':' */
+    buf ++;
+    bufSize --;
+  }
+  
+  if (bufSize > LORAWAN_APP_DATA_BUFF_SIZE)
+  {
+    bufSize = LORAWAN_APP_DATA_BUFF_SIZE;
+  }
+  memcpy1(AppData.Buff, (uint8_t *)buf, bufSize);
+  AppData.BuffSize = bufSize;
+  AppData.Port= appPort;
+  
+  status = LORA_send( &AppData, lora_config_reqack_get() );
+  
+  if (status == LORA_SUCCESS)
+  {
+    return AT_OK;
+  }
+  else
+  {
+    return AT_ERROR;
+  }
 }
 
 ATEerror_t at_ReceiveBinary(const char *param)
@@ -950,7 +1079,9 @@ ATEerror_t at_Receive(const char *param)
 
 ATEerror_t at_version_get(const char *param)
 {
-  AT_PRINTF(AT_VERSION_STRING"\r\n");
+  AT_PRINTF(AT_VERSION_STRING" ");
+	region_printf();
+	
   return AT_OK;
 }
 
@@ -959,10 +1090,10 @@ ATEerror_t at_ack_set(const char *param)
   switch (param[0])
   {
     case '0':
-      lora_config_reqack_set(DISABLE);
+      lora_config_reqack_set(LORAWAN_UNCONFIRMED_MSG);
       break;
     case '1':
-      lora_config_reqack_set(ENABLE);
+      lora_config_reqack_set(LORAWAN_CONFIRMED_MSG);
       break;
     default:
       return AT_PARAM_ERROR;
@@ -973,13 +1104,13 @@ ATEerror_t at_ack_set(const char *param)
 
 ATEerror_t at_ack_get(const char *param)
 {
-  print_d (((lora_config_reqack_get() == ENABLE) ? 1 : 0));
+  print_d (((lora_config_reqack_get() == LORAWAN_CONFIRMED_MSG) ? 1 : 0));
   return AT_OK;
 }
 
 ATEerror_t at_isack_get(const char *param)
 {
-  print_d(((lora_config_isack_get() == ENABLE) ? 1 : 0));
+  print_d(((lora_config_isack_get() == LORA_ENABLE) ? 1 : 0));
   return AT_OK;
 }
 
@@ -997,7 +1128,7 @@ ATEerror_t at_rssi_get(const char *param)
 
 ATEerror_t at_TDC_set(const char *param)
 { 
-	if (tiny_sscanf(param, "%lu", &LoRaParamInit->TxDutyCycleTime) != 1)
+	if (tiny_sscanf(param, "%lu", &APP_TX_DUTYCYCLE) != 1)
   {
     return AT_PARAM_ERROR;
   }
@@ -1005,9 +1136,207 @@ ATEerror_t at_TDC_set(const char *param)
 }
 ATEerror_t at_TDC_get(const char *param)
 { 
-	print_d(LoRaParamInit->TxDutyCycleTime);
+	print_d(APP_TX_DUTYCYCLE);
 	return AT_OK;
 }
+
+ATEerror_t at_application_port_set(const char *param)
+{
+	 int8_t application_port;
+
+  if (tiny_sscanf(param, "%hhu", &application_port) != 1)
+  {
+    return AT_PARAM_ERROR;
+  }
+  
+  lora_config_application_port_set(application_port) ;
+
+  return AT_OK;
+}
+
+ATEerror_t at_application_port_get(const char *param)
+{
+	print_d(lora_config_application_port_get());
+	return AT_OK;
+}
+
+ATEerror_t at_CHE_set(const char *param)
+{
+	uint8_t fre;
+	if (tiny_sscanf(param, "%d", &fre) != 1)
+  {
+    return AT_PARAM_ERROR;
+  }
+	
+	#if defined ( REGION_CN470 )
+	if(fre>2)
+	{
+		fre=1;
+	}
+	#elif defined ( REGION_US915 )
+	if(fre>8)
+	{
+		fre=1;
+	}
+	#elif defined ( REGION_AU915 )
+	if(fre>9)
+	{
+		fre=1;
+	}
+	#else
+	fre=0;
+	#endif
+	
+	customize_set8channel_set(fre);
+	
+	return AT_OK;
+}
+
+ATEerror_t at_CHE_get(const char *param)
+{ 
+  print_d(customize_set8channel_get());
+	uint8_t i;
+	double fre1;
+	double j,k,l;
+	
+	i=customize_set8channel_get();
+	
+	#if defined ( REGION_CN470 )
+	  j=486.3;k=1.6;l=0.2;
+	#elif defined ( REGION_US915 )
+	if(i==9)
+	{
+    j=902.2;k=0.1;l=1.6;
+	}
+	else
+	{j=902.3;k=1.6;l=0.2;}
+	#else
+	if(i==10)
+	{
+    j=915.0;k=0.1;l=1.6;
+	}
+	else
+	{j=915.2;k=1.6;l=0.2;}
+	#endif
+	
+	if(i)
+	{
+	  fre1=j+(i-1)*k;
+	  for(int i=0;i<8;i++)
+	  {		
+		  AT_PRINTF("%.1f ",fre1);
+		  fre1=fre1+l;
+	  }
+	  AT_PRINTF("\n\r");
+  }
+	 else AT_PRINTF("Use default channel");
+	
+	return AT_OK;
+}
+
+ATEerror_t at_CHS_set(const char *param)
+{
+	uint32_t fre;
+	if (tiny_sscanf(param, "%lu", &fre) != 1)
+  {
+    return AT_PARAM_ERROR;
+  }
+	
+	if((100000000<fre&&fre<999999999)||fre==0)
+	{
+	  customize_freq1_set(fre);
+	}
+	else 
+	{
+		return AT_PARAM_ERROR;
+	}
+	
+	return AT_OK;
+}
+
+ATEerror_t at_CHS_get(const char *param)
+{ 
+	print_d(customize_freq1_get());
+	return AT_OK;
+}
+
+ATEerror_t at_symbtimeout1LSB_get(const char *param)
+{ 
+   print_d(symbtime1_value);
+	 return AT_OK;
+}
+
+ATEerror_t at_symbtimeout1LSB_set(const char *param)
+{ 
+	int symbtime1;
+	if (tiny_sscanf(param, "%d", &symbtime1) != 1)
+  {
+    return AT_PARAM_ERROR;
+  }
+	if ((symbtime1>=0)&&(symbtime1<=255))
+  { 
+		 flag1=1;
+		 symbtime1_value=symbtime1;
+  }
+	else
+	{
+    return AT_PARAM_ERROR;
+	}
+	
+	return AT_OK;
+}
+
+ATEerror_t at_symbtimeout2LSB_get(const char *param)
+{ 
+   print_d(symbtime2_value);
+	 return AT_OK;
+}
+
+ATEerror_t at_symbtimeout2LSB_set(const char *param)
+{ 
+	int symbtime2;
+	if (tiny_sscanf(param, "%d", &symbtime2) != 1)
+  {
+    return AT_PARAM_ERROR;
+  }
+	if ((symbtime2>=0)&&(symbtime2<=255))
+  { 
+		 flag2=1;
+		 symbtime2_value=symbtime2;
+  }
+	else
+	{
+    return AT_PARAM_ERROR;
+	}
+	
+	return AT_OK;
+}
+
+ATEerror_t at_MOD_set(const char *param)
+{ 
+	int workmode;
+	if (tiny_sscanf(param, "%d", &workmode) != 1)
+  {
+    return AT_PARAM_ERROR;
+  }
+	if ((workmode==1)||(workmode==2))
+  {
+    mode=workmode;		
+	}
+	else
+	{
+    return AT_PARAM_ERROR;
+	}
+	
+	return AT_OK;
+}
+
+ATEerror_t at_MOD_get(const char *param)
+{ 
+	print_d(mode);
+	return AT_OK;
+}
+
 /* Private functions ---------------------------------------------------------*/
 
 static ATEerror_t translate_status(LoRaMacStatus_t status)
